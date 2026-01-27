@@ -55,7 +55,25 @@ class SONiC_vm(vrnetlab.VM):
         self.conn_mode = conn_mode
         self.num_nics = 96
         self.hostname = hostname
-
+        # Whether the management interface is pass-through or host-forwarded.
+        # Host-forwarded is the original vrnetlab mode where a VM gets a static IP for its management address,
+        # which **does not** match the eth0 interface of a container.
+        # In pass-through mode the VM container uses the same IP as the container's eth0 interface and transparently forwards traffic between the two interfaces.
+        # See https://github.com/hellt/vrnetlab/issues/286
+        self.mgmt_passthrough = mgmt_passthrough
+        mgmt_passthrough_override = os.environ.get("CLAB_MGMT_PASSTHROUGH", "")
+        if mgmt_passthrough_override:
+            self.mgmt_passthrough = mgmt_passthrough_override.lower() == "true"
+        # Populate management IP and gateway
+        if self.mgmt_passthrough:
+            self.mgmt_address_ipv4, self.mgmt_address_ipv6 = self.get_mgmt_address()
+            self.mgmt_gw_ipv4, self.mgmt_gw_ipv6 = self.get_mgmt_gw()
+        else:
+            self.mgmt_address_ipv4 = "10.0.0.15/24"
+            self.mgmt_address_ipv6 = "2001:db8::2/64"
+            self.mgmt_gw_ipv4 = "10.0.0.2"
+            self.mgmt_gw_ipv6 = "2001:db8::1"
+    
     def create_tc_tap_mgmt_ifup(self):
         # this is used when using pass-through mode for mgmt connectivity
         """Create tap ifup script that is used in tc datapath mode, specifically for the management interface"""
@@ -145,7 +163,13 @@ class SONiC_vm(vrnetlab.VM):
         """Do the actual bootstrap config"""
         self.logger.info("applying bootstrap configuration")
         self.wait_write("sudo -i", "$")
-        self.wait_write("/usr/sbin/ip address add 10.0.0.15/24 dev eth0", "#")
+
+        if self.mgmt_passthrough:
+            self.mgmt_address_ipv4, self.mgmt_address_ipv6 = self.get_mgmt_address()
+            self.mgmt_gw_ipv4, self.mgmt_gw_ipv6 = self.get_mgmt_gw()
+        else:
+            self.wait_write("/usr/sbin/ip address add 10.0.0.15/24 dev eth0", "#")
+
         self.wait_write("passwd -q %s" % (self.username))
         self.wait_write(self.password, "New password:")
         self.wait_write(self.password, "password:")

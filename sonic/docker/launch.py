@@ -55,67 +55,7 @@ class SONiC_vm(vrnetlab.VM):
         self.conn_mode = conn_mode
         self.num_nics = 96
         self.hostname = hostname
-        # Whether the management interface is pass-through or host-forwarded.
-        # Host-forwarded is the original vrnetlab mode where a VM gets a static IP for its management address,
-        # which **does not** match the eth0 interface of a container.
-        # In pass-through mode the VM container uses the same IP as the container's eth0 interface and transparently forwards traffic between the two interfaces.
-        # See https://github.com/hellt/vrnetlab/issues/286
-        self.mgmt_passthrough = mgmt_passthrough
-        mgmt_passthrough_override = os.environ.get("CLAB_MGMT_PASSTHROUGH", "")
-        if mgmt_passthrough_override:
-            self.mgmt_passthrough = mgmt_passthrough_override.lower() == "true"
-        # Populate management IP and gateway
-        if self.mgmt_passthrough:
-            self.mgmt_address_ipv4, self.mgmt_address_ipv6 = self.get_mgmt_address()
-            self.mgmt_gw_ipv4, self.mgmt_gw_ipv6 = self.get_mgmt_gw()
-        else:
-            self.mgmt_address_ipv4 = "10.0.0.15/24"
-            self.mgmt_address_ipv6 = "2001:db8::2/64"
-            self.mgmt_gw_ipv4 = "10.0.0.2"
-            self.mgmt_gw_ipv6 = "2001:db8::1"
-    
-    def create_tc_tap_mgmt_ifup(self):
-        # this is used when using pass-through mode for mgmt connectivity
-        """Create tap ifup script that is used in tc datapath mode, specifically for the management interface"""
-        ifup_script = """#!/bin/bash
 
-        ip link set tap0 up
-        ip link set tap0 mtu 65000
-
-        # create tc eth<->tap redirect rules
-
-        tc qdisc add dev eth0 clsact
-        # exception for TCP ports 5000-5007
-        tc filter add dev eth0 ingress prio 1 protocol ip flower ip_proto tcp dst_port 5000-5007 action pass
-        # mirror ARP traffic to container
-        tc filter add dev eth0 ingress prio 2 protocol arp flower action mirred egress mirror dev tap0
-        # redirect rest of ingress traffic of eth0 to egress of tap0
-        tc filter add dev eth0 ingress prio 3 flower action mirred egress redirect dev tap0
-        # redirect all ingress traffic of tap0 to egress of eth0
-        tc filter add dev tap0 ingress flower action mirred egress redirect dev eth0
-
-        # clone management MAC of the VM
-        ip link set dev eth0 address {MGMT_MAC}
-
-        # configure the ip address of the namespace as it was the host and remove the temporary one
-        ip netns exec fakehost ip addr add {MGMT_CONTAINER_GW}/{MGMT_IP_PREFIXLEN} dev FA
-        ip netns exec fakehost ip addr del  169.254.254.254/16 dev FA
-        """
-
-        mgmt_ip_v4_address, mgmt_ip_v4_prefixlen = self.mgmt_address_ipv4.split("/")
-
-        ifup_script = ifup_script.replace("{MGMT_MAC}", self.mgmt_mac)
-        ifup_script = ifup_script.replace(
-            "{FAKEHOST_VETH_MAC_ADDR}", FAKEHOST_VETH_MAC_ADDR
-        )
-        ifup_script = ifup_script.replace("{MGMT_CONTAINER_GW}", self.mgmt_gw_ipv4)
-        ifup_script = ifup_script.replace("{MGMT_IP_PREFIXLEN}", mgmt_ip_v4_prefixlen)
-        ifup_script = ifup_script.replace("{MGMT_IP_ADDRESS}", mgmt_ip_v4_address)
-
-        with open("/etc/tc-tap-mgmt-ifup", "w") as f:
-            f.write(ifup_script)
-        os.chmod("/etc/tc-tap-mgmt-ifup", 0o777)
-    
     def bootstrap_spin(self):
         """This function should be called periodically to do work."""
 
@@ -163,13 +103,7 @@ class SONiC_vm(vrnetlab.VM):
         """Do the actual bootstrap config"""
         self.logger.info("applying bootstrap configuration")
         self.wait_write("sudo -i", "$")
-
-        if self.mgmt_passthrough:
-            self.mgmt_address_ipv4, self.mgmt_address_ipv6 = self.get_mgmt_address()
-            self.mgmt_gw_ipv4, self.mgmt_gw_ipv6 = self.get_mgmt_gw()
-        else:
-            self.wait_write("/usr/sbin/ip address add 10.0.0.15/24 dev eth0", "#")
-
+        self.wait_write("/usr/sbin/ip address add 10.0.0.15/24 dev eth0", "#")
         self.wait_write("passwd -q %s" % (self.username))
         self.wait_write(self.password, "New password:")
         self.wait_write(self.password, "password:")

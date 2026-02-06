@@ -118,7 +118,7 @@ class SONiC_vm(vrnetlab.VM):
         )
         # Set IPv6 Management Gateway:
         self.wait_write(
-            f"sudo /usr/sbin/ip -6 route add default via {mgmt_gw_ipv6} dev eth0", "#"
+            f"sudo /usr/sbin/ip -6 route add default via {self.mgmt_gw_ipv6} dev eth0", "#"
         )
         self.wait_write("passwd -q %s" % (self.username))
         self.wait_write(self.password, "New password:")

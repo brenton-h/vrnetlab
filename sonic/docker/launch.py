@@ -103,20 +103,20 @@ class SONiC_vm(vrnetlab.VM):
         """Do the actual bootstrap config"""
         self.logger.info("applying bootstrap configuration")
         self.wait_write("sudo -i", "$")
-        # Set IPv4 Address:
+        # Set IPv4 Management Address:
         self.wait_write(
             f"sudo /usr/sbin/ip address add {self.mgmt_address_ipv4} dev eth0", "#"
         )
-        # Set IPv4 Gateway:
+        # Set IPv4 Management Gateway:
         self.wait_write(
             f"sudo /usr/sbin/ip route add default via {self.mgmt_gw_ipv4} dev eth0", "#"
         )
         # IPv6 is untested - it has reported problems under Enterprise SONiC
-        # Set IPv6 Address:
+        # Set IPv6 Management Address:
         self.wait_write(
             f"sudo /usr/sbin/ip -6 address add {self.mgmt_address_ipv6} dev eth0", "#"
         )
-        # Set IPv6 Gateway:
+        # Set IPv6 Management Gateway:
         self.wait_write(
             f"sudo /usr/sbin/ip -6 route add default via {mgmt_gw_ipv6} dev eth0", "#"
         )

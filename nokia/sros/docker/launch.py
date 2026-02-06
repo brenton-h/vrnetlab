@@ -1288,6 +1288,10 @@ class SROS_vm(vrnetlab.VM):
                         self.logger.debug("Detected classic startup configuration")
                         classic_cfg = True
                         break
+                    if "configure {" == l_clean:
+                        self.logger.debug("Detected model-driven startup configuration")
+                        classic_cfg = False
+                        break
 
         if classic_cfg:
             sros_scrapli_dev["variant"] = "classic"

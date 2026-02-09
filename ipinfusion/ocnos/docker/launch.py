@@ -109,13 +109,37 @@ class OCNOS_vm(vrnetlab.VM):
         self.wait_write(cmd="configure terminal", wait="#")
         self.wait_write(cmd="interface eth0", wait="(config)#")
         self.wait_write(cmd="ip vrf forwarding management", wait="(config-if)#")
-        self.wait_write(cmd="commit", wait="(config-if)#")
-        self.wait_write(cmd="ip address dhcp", wait="(config-if)#")
-        self.wait_write(cmd="commit", wait="(config-if)#")
+        # Set IPv4 Management Address if present:
+        if self.mgmt_address_ipv4 and "." in self.mgmt_address_ipv4:
+            self.wait_write(
+                cmd=f"ip address {self.mgmt_address_ipv4}", wait="(config-if)#"
+            )
+        else:
+            self.wait_write(
+                cmd="ip address dhcp", wait="(config-if)#"
+            )
+        # Note: IPv6 has not been fully tested
+        # Set IPv6 Management Address if present:
+        if self.mgmt_address_ipv6 and ":" in self.mgmt_address_ipv6:
+            self.wait_write(
+                cmd=f"ipv6 address {self.mgmt_address_ipv6}", wait="(config-if)#"
+            )
+        else:
+            self.wait_write(
+                cmd="ipv6 address dhcp", wait="(config-if)#"
+            )
         self.wait_write(cmd="exit", wait="(config-if)#")
-        self.wait_write(
-            cmd="ip route vrf management 0.0.0.0/0 10.0.0.2 eth0", wait="(config)#"
-        )
+        # Set IPv4 Management Gateway if present:
+        if self.mgmt_gw_ipv4 and "." in self.mgmt_gw_ipv4:
+            self.wait_write(
+                cmd=f"ip route vrf management 0.0.0.0/0 {self.mgmt_gw_ipv4} eth0", wait="(config)#"
+            )
+        # Note: IPv6 has not been fully tested
+        # Set IPv6 Management Gateway if present:
+        if self.mgmt_gw_ipv6 and ":" in self.mgmt_gw_ipv6:
+            self.wait_write(
+                cmd=f"ipv6 route vrf management ::/0 {self.mgmt_gw_ipv6} eth0", wait="(config)#"
+            )
         self.wait_write(cmd="commit", wait="(config)#")
 
     def bootstrap_config(self):

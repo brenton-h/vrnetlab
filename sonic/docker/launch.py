@@ -103,7 +103,31 @@ class SONiC_vm(vrnetlab.VM):
         """Do the actual bootstrap config"""
         self.logger.info("applying bootstrap configuration")
         self.wait_write("sudo -i", "$")
-        self.wait_write("/usr/sbin/ip address add 10.0.0.15/24 dev eth0", "#")
+        # Set IPv4 Management Address if present:
+        if self.mgmt_address_ipv4 and "." in self.mgmt_address_ipv4:
+            self.wait_write(
+               f"/usr/sbin/ip address add {self.mgmt_address_ipv4} dev eth0",
+               "#"
+           )
+        # Note: IPv6 has not been fully tested - it has reported problems under Enterprise SONiC
+        # Set IPv6 Management Address if present:
+        if self.mgmt_address_ipv6 and ":" in self.mgmt_address_ipv6:
+            self.wait_write(
+                f"/usr/sbin/ip -6 address add {self.mgmt_address_ipv6} dev eth0",
+                "#"
+            )
+        # Set IPv4 Management Gateway if present:
+        if self.mgmt_gw_ipv4 and "." in self.mgmt_gw_ipv4:
+            self.wait_write(
+                f"while ! /usr/sbin/ip link show eth0 | grep -q \"state UP\"; do sleep 1; done; /usr/sbin/ip route add default via {self.mgmt_gw_ipv4} dev eth0",
+                "#"
+            )
+        # Set IPv6 Management Gateway if present:
+        if self.mgmt_gw_ipv6 and ":" in self.mgmt_gw_ipv6:
+            self.wait_write(
+                f"while ! /usr/sbin/ip link show eth0 | grep -q \"state UP\"; do sleep 1; done;/usr/sbin/ip -6 route add default via {self.mgmt_gw_ipv6} dev eth0",
+                "#"
+            )
         self.wait_write("passwd -q %s" % (self.username))
         self.wait_write(self.password, "New password:")
         self.wait_write(self.password, "password:")
